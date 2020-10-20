@@ -12,3 +12,9 @@ aproximadamente 0.5s e acompanhar a leitura do codigo com um display LCD
 
 Para o teste foi usado um STM32f401RE, display LCD 16x2, CI PCF8574A7 e 
 jumpers. 
+
+
+## 009PWM_input_lcd16x2
+
+Código fazendo leitura e filtragem do receptor HK6s, bem como envio dos 
+sinais PWM para o driver de motor.
