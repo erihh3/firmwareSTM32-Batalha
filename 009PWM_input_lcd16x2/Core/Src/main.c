@@ -193,28 +193,43 @@ int main(void)
 	  mov_v = receiver_map(mov_v, 1045, 2065, 0, 1000);
 	  mov_h = (uint32_t) Difference1;
 	  mov_h = receiver_map(mov_h, 1130, 1945, 0, 1000);
-
+/*
 	  if (Difference < 1045) TIM3->CCR3 = 0;
 	  else if (Difference > 2065) TIM3->CCR3 = TIM3->ARR;
 	  else{
 		  TIM3->CCR3 = mov_v;
 	  }
 
-	  if (mov_v > 450 && mov_v < 550) TIM3->CCR3 = 500;
+	  if (mov_v > 430 && mov_v < 570) TIM3->CCR3 = 500;
 	  else {
 		  TIM3->CCR3 = mov_v;
 	  }
+*/
+	  if (mov_v > 460 && mov_v < 540){
+		  TIM3->CCR2 = 0;
+		  TIM3->CCR3 = 0;
+	  }
+	  else if (mov_v >= 540 && mov_v < 1000){
+		  TIM3->CCR2 = 0;
+		  TIM3->CCR3 = mov_v;
+	  }
+	  else if (mov_v <= 460 && mov_v > 0){
+		  TIM3->CCR2 = 1000 - mov_v;
+		  TIM3->CCR3 = 0;
+	  }
 
-
+/*
 	  if (Difference1 < 1130) TIM3->CCR2 = 0;
 	  else if (Difference1 > 1945) TIM3->CCR2 = TIM3->ARR;
 	  else{
 		  TIM3->CCR2 = mov_h;
 	  }
-	  if (mov_h > 450 && mov_h < 550) TIM3->CCR2 = 500;
+	  if (mov_h > 430 && mov_h < 570) TIM3->CCR2 = 500;
 	  else {
 		  TIM3->CCR2 = mov_h;
 	  }
+
+	  */
 
 	  /*TIM3->CCR3 = mov_v;
 	  TIM3->CCR2 = mov_h;*/
