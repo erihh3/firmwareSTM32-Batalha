@@ -22,7 +22,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include "i2c-lcd.h"
+//#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,6 +34,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define max_remap 500
+#define min_remap -500
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -57,6 +61,9 @@ static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
+void pwm_init(void); // Função para inicializar o pwm e zerar o duty cycle
+//void control_remap(void); // Função para remapear o pulso lido pelo receptor
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -70,8 +77,8 @@ uint32_t IC_Val4 = 0;
 uint32_t Difference1 = 0;
 uint8_t Is_First_Captured1 = 0;
 //int duty=0;
-uint32_t mov_v = 0;
-uint32_t mov_h = 0;
+int32_t mov_v = 0;
+int32_t mov_h = 0;
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
@@ -133,7 +140,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 		}
 }
 
-uint32_t receiver_map(uint32_t x, uint32_t in_min, uint32_t in_max, uint32_t out_min, uint32_t out_max) {
+int32_t receiver_map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min, int32_t out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 /* USER CODE END 0 */
@@ -146,6 +153,8 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   char buffer [4];
+  int32_t vel_e;
+  int32_t vel_d;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -172,11 +181,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   lcd_init();
 
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-
-  TIM3->CCR3 = 0;
-  TIM3->CCR2 = 0;
+  pwm_init();
 
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
@@ -189,10 +194,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  mov_v = (uint32_t) Difference;
-	  mov_v = receiver_map(mov_v, 1045, 2065, 0, 1000);
-	  mov_h = (uint32_t) Difference1;
-	  mov_h = receiver_map(mov_h, 1130, 1945, 0, 1000);
+	  mov_v = (int32_t) Difference;
+	  mov_v = receiver_map(mov_v, 1045, 2065, min_remap, max_remap);
+	  mov_h = (int32_t) Difference1;
+	  mov_h = receiver_map(mov_h, 1130, 1945, min_remap, max_remap);
 /*
 	  if (Difference < 1045) TIM3->CCR3 = 0;
 	  else if (Difference > 2065) TIM3->CCR3 = TIM3->ARR;
@@ -204,20 +209,67 @@ int main(void)
 	  else {
 		  TIM3->CCR3 = mov_v;
 	  }
-*/
-	  if (mov_v > 460 && mov_v < 540){
+
+
+	  if (mov_v > -20 && mov_v < 20){
 		  TIM3->CCR2 = 0;
 		  TIM3->CCR3 = 0;
 	  }
-	  else if (mov_v >= 540 && mov_v < 1000){
+	  else if (mov_v >= 20 && mov_v < max_remap){
 		  TIM3->CCR2 = 0;
 		  TIM3->CCR3 = mov_v;
 	  }
-	  else if (mov_v <= 460 && mov_v > 0){
+	  else if (mov_v <= -20 && mov_v > min_remap){
 		  TIM3->CCR2 = 1000 - mov_v;
 		  TIM3->CCR3 = 0;
 	  }
+*/
+	  if ((mov_v > -30 && mov_v < 30) && (mov_h > -30 && mov_h < 30)){
+		  mov_v=0;
+		  mov_h=0;
+	  }
+	  else if (mov_v >= max_remap)	mov_v = max_remap;
+	  else if (mov_v <= min_remap)	mov_v = min_remap;
+	  //if (mov_h > -20 && mov_v < 20)	mov_h = 0;
+	  else if (mov_h >= max_remap)	mov_h = max_remap;
+	  else if (mov_h <= min_remap)	mov_h = min_remap;
 
+	  vel_e = 1.5*mov_v + 0.4*mov_h;
+	  vel_d = 1.5*mov_v - 0.4*mov_h;
+/*
+	  if (mov_v >= max_remap)	mov_v = max_remap;
+	  else if (mov_v <= min_remap)	mov_v = min_remap;
+	  else if (mov_h >= max_remap)	mov_h = max_remap;
+	  else if (mov_h <= min_remap)	mov_h = min_remap;
+	  */
+	  //motor esquerdo
+	  if(vel_e>0){
+		  TIM3->CCR2 = vel_e;
+		  TIM3->CCR3 = 0;
+	  }
+	  else{
+		  TIM3->CCR2 = 0;
+		  TIM3->CCR3 = -vel_e;
+	  }
+	  //motor direito
+	  if(vel_d>0){
+		  TIM3->CCR1 = vel_d;
+		  TIM3->CCR4 = 0;
+	  }
+	  else{
+		  TIM3->CCR1 = 0;
+		  TIM3->CCR4 = -vel_d;
+	  }
+/*
+	  else if(mov_v<0){
+		  //motor esquerdo
+		  TIM3->CCR2 = 0;
+		  TIM3->CCR3 = mov_v + 0.2*mov_h;
+		  //Motor direito
+		  TIM3->CCR1 = 0;
+		  TIM3->CCR4 = mov_v - 0.2*mov_h;
+	  }
+*/
 /*
 	  if (Difference1 < 1130) TIM3->CCR2 = 0;
 	  else if (Difference1 > 1945) TIM3->CCR2 = TIM3->ARR;
@@ -238,12 +290,12 @@ int main(void)
 
 	  lcd_put_cur(0, 0);
 	  lcd_send_string("Y:");
-	  sprintf(buffer, "%lu", mov_v);
+	  sprintf(buffer, "%ld", mov_v);
 	  lcd_send_string(buffer);
 
 	  lcd_put_cur(1, 0);
 	  lcd_send_string("X:");
-	  sprintf(buffer, "%lu", mov_h);
+	  sprintf(buffer, "%ld", mov_h);
 	  lcd_send_string(buffer);
 
 	  HAL_Delay(500);
@@ -254,8 +306,8 @@ int main(void)
 
 	  lcd_clear();
   }
-  /* USER CODE END 3 */
 }
+  /* USER CODE END 3 */
 
 /**
   * @brief System Clock Configuration
@@ -425,11 +477,19 @@ static void MX_TIM3_Init(void)
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
   }
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
   {
     Error_Handler();
   }
@@ -457,6 +517,23 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void pwm_init(void){
+	  // Motor esquerdo
+	  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+	  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+
+	  TIM3->CCR3 = 0;
+	  TIM3->CCR2 = 0;
+
+	  // Motor direito
+
+	  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+	  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+
+	  TIM3->CCR1 = 0;
+	  TIM3->CCR4 = 0;
+}
 
 /* USER CODE END 4 */
 
